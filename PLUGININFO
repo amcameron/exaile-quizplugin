@@ -1,0 +1,4 @@
+Version='0.1'
+Authors=['Andrew Cameron <andrew@acameron.org>']
+Name='Music quizzer'
+Description='A plugin to quiz you on details about tracks from your playlist.'
