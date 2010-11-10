@@ -8,6 +8,8 @@ user with a bank of answers.  Solutions are given at the end of the quiz.
 from random import randrange, sample
 from time import sleep
 
+from xl import player
+
 #TODO: select random clips from tracks,
 #	create answer bank, show user answer bank after each clip, track
 #	correct/incorrect responses, and show results at end of quiz.
@@ -82,8 +84,9 @@ class Quizzer(object):
 
 		for clip in subset:
 			print "playing clip!"
-			self.exaile.player.play(clip)
-			self.exaile.player.seek(clipStarts.pop(0))
+			player.QUEUE.play(clip)
+			player.PLAYER.unpause() # without this, seek fails.
+			player.PLAYER.seek(clipStarts.pop(0))
 			sleep(_clip_length)
 			self.exaile.player.stop()
 			print "done playing clip."
