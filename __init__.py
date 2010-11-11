@@ -77,7 +77,8 @@ class Quizzer(object):
 
 		# When closed, don't prompt the user, just close the window.
 		self.window.connect("delete_event", lambda x,y: False)
-		self.window.connect("destroy", self._destroy)
+		self.window.connect_object("destroy", Window.destroy,
+			self.window)
 
 		# Create a button to start the quiz.
 		self.button = Button("Start quiz!")
@@ -88,9 +89,6 @@ class Quizzer(object):
 		self.window.show()
 
 		log.debug("Quizzer plugin loaded.")
-
-	def _destroy(self, widget, data=None):
-		main_quit()
 
 	def quiz(self, widget=None):
 		"""Quiz the user on a random subset of the playlist."""
