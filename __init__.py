@@ -10,6 +10,8 @@ from time import sleep
 from logging import getLogger
 
 from xl import player
+from xl.event import add_callback
+from gtk import Button, Window, main_quit
 
 #TODO: select random clips from tracks,
 #	create answer bank, show user answer bank after each clip, track
@@ -17,19 +19,22 @@ from xl import player
 
 log = getLogger(__name__)
 _pl_name = 'lq2'
-_clip_length = 20 # seconds
+_clip_length = 5 # seconds
+_def_num_songs = 3
 QUIZZER_PLUGIN = None
 
 
 def enable(exaile):
 	if (exaile.loading):
-		event.add_callback(_enable, 'exaile_loaded')
+		add_callback(_enable, 'exaile_loaded')
 	else:
 		_enable(None, exaile, None)
 
 
 def disable(exaile):
+	global QUIZZER_PLUGIN
 	log.info('It is a good day to die.')
+	QUIZZER_PLUGIN = None
 
 
 def _enable(eventname, exaile, nothing):
@@ -63,19 +68,29 @@ class Quizzer(object):
 	def __init__(self, exaile):
 		self.exaile = exaile
 		self.playlist = exaile.playlists.get_playlist(_pl_name)
+		self.num_songs = min(_def_num_songs, len(self.playlist))
+		self.window = Window()
+
+		# When closed, don't prompt the user, just close the window.
+		self.window.connect("delete_event", lambda x,y: False)
+		self.window.connect("destroy", self._destroy)
+
+		# Create a button to start the quiz.
+		self.button = Button("Start quiz!")
+		self.button.connect("clicked", self.quiz)
+
+		self.window.add(self.button)
+		self.button.show()
+		self.window.show()
+
 		log.debug("Quizzer plugin loaded.")
 
-	def quiz(self, num_songs=None):
-		"""Quiz the user on a random subset of the playlist.
+	def _destroy(self, widget, data=None):
+		main_quit()
 
-		num_songs (optional): the number of songs to select. Default
-			is min(5, len(playlist)).
-
-		"""
-		if num_songs is None:
-			num_songs = min(len(self.playlist), 5)
-
-		subset = sample(self.playlist, num_songs)
+	def quiz(self, widget=None):
+		"""Quiz the user on a random subset of the playlist."""
+		subset = sample(self.playlist, self.num_songs)
 		clipStarts = [randrange(0, int(_length(i)) - _clip_length, 1)
 			for i in subset]
 		log.debug("Clip starts: %s" % clipStarts)
@@ -92,22 +107,22 @@ class Quizzer(object):
 			self.exaile.player.stop()
 			log.info("done playing clip.")
 			print "Artists:"
-			for i, ans in zip(range(1, num_songs+1), self.answers):
+			for i, ans in zip(range(1, self.num_songs+1), self.answers):
 				print "{0}. {1}".format(i, ans['artist'])
 			a = raw_input("Choose an artist: ")
 			a = self.answers[int(a)-1]['artist']
 			print "Titles:"
-			for i, ans in zip(range(1, num_songs+1), self.answers):
+			for i, ans in zip(range(1, self.num_songs+1), self.answers):
 				print "{0}. {1}".format(i, ans['title'])
 			t = raw_input("Choose a title: ")
 			t = self.answers[int(t)-1]['title']
 			print "Genres:"
-			for i, ans in zip(range(1, num_songs+1), self.answers):
+			for i, ans in zip(range(1, self.num_songs+1), self.answers):
 				print "{0}. {1}".format(i, ans['genre'])
 			g = raw_input("Choose a genre: ")
 			g = self.answers[int(g)-1]['genre']
 			print "Years:"
-			for i, ans in zip(range(1, num_songs+1), self.answers):
+			for i, ans in zip(range(1, self.num_songs+1), self.answers):
 				print "{0}. {1}".format(i, ans['year'])
 			y = raw_input("Choose a year: ")
 			y = self.answers[int(y)-1]['year']
@@ -115,7 +130,7 @@ class Quizzer(object):
 				'genre':g, 'year':y})
 			# TODO: show answer bank; prompt choices.
 
-		for i in xrange(num_songs):
+		for i in xrange(self.num_songs):
 			print "Correct answer:"
 			print self.answers[i]
 			print "Your answer:"
