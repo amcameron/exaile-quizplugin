@@ -8,6 +8,7 @@ user with a bank of answers.  Solutions are given at the end of the quiz.
 from random import randrange, sample
 from time import sleep
 from logging import getLogger
+from threading import Thread
 
 from xl import player
 from xl.event import add_callback
@@ -71,13 +72,16 @@ class Quizzer(object):
 		self.num_songs = min(_def_num_songs, len(self.playlist))
 		self.window = Window()
 
+		# Prepare quiz to run in a separate thread.
+		self.thread = Thread(target=self.quiz)
+
 		# When closed, don't prompt the user, just close the window.
 		self.window.connect("delete_event", lambda x,y: False)
 		self.window.connect("destroy", self._destroy)
 
 		# Create a button to start the quiz.
 		self.button = Button("Start quiz!")
-		self.button.connect("clicked", self.quiz)
+		self.button.connect_object("clicked", Thread.run, self.thread)
 
 		self.window.add(self.button)
 		self.button.show()
