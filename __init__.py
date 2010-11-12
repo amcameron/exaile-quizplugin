@@ -4,6 +4,7 @@ It randomly selects and plays a short clip from each song and presents the
 user with a bank of answers.  Solutions are given at the end of the quiz.
 
 """
+# TODO: Make the interface file work without specifying an absolute path.
 
 from random import randrange, sample
 from time import sleep
@@ -12,11 +13,8 @@ from threading import Thread
 
 from xl import player
 from xl.event import add_callback
-from gtk import Button, Window, main_quit
-
-#TODO: select random clips from tracks,
-#	create answer bank, show user answer bank after each clip, track
-#	correct/incorrect responses, and show results at end of quiz.
+from gtk import Builder, Window, Notebook, Adjustment, HBox
+from gtk import combo_box_new_text, TextBuffer
 
 log = getLogger(__name__)
 _pl_name = 'lq2'
@@ -35,6 +33,7 @@ def enable(exaile):
 def disable(exaile):
 	global QUIZZER_PLUGIN
 	log.info('It is a good day to die.')
+	QUIZZER_PLUGIN.window.destroy()
 	QUIZZER_PLUGIN = None
 
 
@@ -70,7 +69,10 @@ class Quizzer(object):
 		self.exaile = exaile
 		self.playlist = exaile.playlists.get_playlist(_pl_name)
 		self.num_songs = min(_def_num_songs, len(self.playlist))
-		self.window = Window()
+		b = Builder()
+		b.add_from_file(
+			'/home/andrew/.local/share/exaile/plugins/jazzquiz/jazzquiz.glade')
+		self.window = b.get_object('QuizWindow')
 
 		# Prepare quiz to run in a separate thread.
 		self.thread = Thread(target=self.quiz)
@@ -80,15 +82,34 @@ class Quizzer(object):
 		self.window.connect_object("destroy", Window.destroy,
 			self.window)
 
-		# Create a button to start the quiz.
-		self.button = Button("Start quiz!")
-		self.button.connect_object("clicked", Thread.run, self.thread)
+		# Connect buttons to move through the notebook.
+		self.start_button = b.get_object('start_button')
+		self.submit_button = b.get_object('submit_button')
+		self.restart_button = b.get_object('restart_button')
+		self.notebook = b.get_object('notebook1')
+		self.start_button.connect_object("clicked", Quizzer.quiz, self)
+		self.submit_button.connect_object("clicked", Quizzer.finish, self)
+		self.restart_button.connect_object("clicked", Notebook.set_current_page,
+				self.notebook, 0)
 
-		self.window.add(self.button)
-		self.button.show()
+		# Connect spinner to self.num_songs
+		temp = Adjustment(value=_def_num_songs, lower=1,
+				upper=len(self.playlist), step_incr=1)
+		self.num_songs_spinner = b.get_object('num_songs_spinner')
+		temp.connect("value_changed", self.change_num_songs,
+				self.num_songs_spinner)
+		self.num_songs_spinner.set_adjustment(temp)
+
+		self.quiz_vbox = b.get_object('quiz_vbox')
+		self.results_textview = b.get_object('results_textview')
+
+		# Done! Show the window!
 		self.window.show()
 
 		log.debug("Quizzer plugin loaded.")
+
+	def change_num_songs(self, widget, spinner):
+		self.num_songs = self.num_songs_spinner.get_value_as_int()
 
 	def quiz(self, widget=None):
 		"""Quiz the user on a random subset of the playlist."""
@@ -98,7 +119,39 @@ class Quizzer(object):
 		log.debug("Clip starts: %s" % clipStarts)
 		self.answers = [{'artist': _artist(i), 'title': _title(i),
 			'genre': _genre(i), 'year': _year(i)} for i in subset]
+		artist_pool = set(_artist(i) for i in subset)
+		title_pool = set(_title(i) for i in subset)
+		date_pool = set(_year(i) for i in subset)
+		genre_pool = set(_genre(i) for i in subset)
 		self.responses = []
+
+		# Set up quiz_vbox. Remove old children if they're lying around.
+		for child in self.quiz_vbox.get_children():
+			self.quiz_vbox.remove(child)
+		for i in xrange(self.num_songs):
+			widget = HBox();
+			artist_cb = combo_box_new_text()
+			for artist in artist_pool:
+				artist_cb.append_text(artist)
+			title_cb = combo_box_new_text()
+			for title in title_pool:
+				title_cb.append_text(title)
+			date_cb = combo_box_new_text()
+			for date in date_pool:
+				date_cb.append_text(date)
+			genre_cb = combo_box_new_text()
+			for genre in genre_pool:
+				genre_cb.append_text(genre)
+			widget.pack_start(artist_cb)
+			widget.pack_start(title_cb)
+			widget.pack_start(date_cb)
+			widget.pack_start(genre_cb)
+			self.quiz_vbox.pack_start(widget)
+
+		self.quiz_vbox.show_all()
+		self.notebook.next_page()
+		# Look into doing follow-up code (running the quiz) with a callback
+		# registered to the notebook's "switch-page" signal.
 
 		for clip in subset:
 			log.info("playing clip!")
@@ -108,33 +161,24 @@ class Quizzer(object):
 			sleep(_clip_length)
 			self.exaile.player.stop()
 			log.info("done playing clip.")
-			print "Artists:"
-			for i, ans in zip(range(1, self.num_songs+1), self.answers):
-				print "{0}. {1}".format(i, ans['artist'])
-			a = raw_input("Choose an artist: ")
-			a = self.answers[int(a)-1]['artist']
-			print "Titles:"
-			for i, ans in zip(range(1, self.num_songs+1), self.answers):
-				print "{0}. {1}".format(i, ans['title'])
-			t = raw_input("Choose a title: ")
-			t = self.answers[int(t)-1]['title']
-			print "Genres:"
-			for i, ans in zip(range(1, self.num_songs+1), self.answers):
-				print "{0}. {1}".format(i, ans['genre'])
-			g = raw_input("Choose a genre: ")
-			g = self.answers[int(g)-1]['genre']
-			print "Years:"
-			for i, ans in zip(range(1, self.num_songs+1), self.answers):
-				print "{0}. {1}".format(i, ans['year'])
-			y = raw_input("Choose a year: ")
-			y = self.answers[int(y)-1]['year']
-			self.responses.append({'artist':a, 'title':t,
-				'genre':g, 'year':y})
-			# TODO: show answer bank; prompt choices.
 
+	def finish(self, widget=None):
+		self.results = ""
 		for i in xrange(self.num_songs):
-			print "Correct answer:"
-			print self.answers[i]
-			print "Your answer:"
-			print self.responses[i]
-		# TODO: show results.
+			current_hbox = self.quiz_vbox.get_children()[i]
+			a = current_hbox.get_children()[0].get_active_text()
+			t = current_hbox.get_children()[1].get_active_text()
+			y = current_hbox.get_children()[2].get_active_text()
+			g = current_hbox.get_children()[3].get_active_text()
+			this_response = {'artist':a, 'title':t, 'genre':g, 'year':y}
+			self.results += "Correct answer:\n"
+			self.results += str(self.answers[i]) + "\n"
+			self.results += "Your answer:\n"
+			self.results += str(this_response) + "\n"
+		log.info("results:\n" + self.results)
+
+		result_buf = TextBuffer()
+		result_buf.set_text(self.results)
+		self.results_textview.set_buffer(result_buf)
+
+		self.notebook.next_page()
