@@ -4,8 +4,8 @@ It randomly selects and plays a short clip from each song and presents the
 user with a bank of answers.  Solutions are given at the end of the quiz.
 
 """
-# TODO: Make the interface file work without specifying an absolute path.
 
+import os
 from random import randrange, sample
 from time import sleep
 from logging import getLogger
@@ -18,7 +18,7 @@ from gtk import combo_box_new_text, TextBuffer
 
 log = getLogger(__name__)
 _pl_name = 'lq2'
-_clip_length = 5 # seconds
+_clip_length = 20 # seconds
 _def_num_songs = 3
 QUIZZER_PLUGIN = None
 
@@ -70,8 +70,8 @@ class Quizzer(object):
 		self.playlist = exaile.playlists.get_playlist(_pl_name)
 		self.num_songs = min(_def_num_songs, len(self.playlist))
 		b = Builder()
-		b.add_from_file(
-			'/home/andrew/.local/share/exaile/plugins/jazzquiz/jazzquiz.glade')
+		basedir = os.path.dirname(os.path.realpath(__file__))
+		b.add_from_file(os.path.join(basedir, 'musicquiz.ui'))
 		self.window = b.get_object('QuizWindow')
 
 		# Prepare quiz to run in a separate thread.
