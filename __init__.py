@@ -74,9 +74,6 @@ class Quizzer(object):
 		b.add_from_file(os.path.join(basedir, 'musicquiz.ui'))
 		self.window = b.get_object('QuizWindow')
 
-		# Prepare quiz to run in a separate thread.
-		self.thread = Thread(target=self.quiz)
-
 		# When closed, don't prompt the user, just close the window.
 		self.window.connect("delete_event", lambda x,y: False)
 		self.window.connect_object("destroy", Window.destroy,
@@ -153,6 +150,12 @@ class Quizzer(object):
 		# Look into doing follow-up code (running the quiz) with a callback
 		# registered to the notebook's "switch-page" signal.
 
+		# Prepare quiz to run in a separate thread.
+		self.thread = Thread(target=self.play_subset,
+						kwargs={'subset':subset, 'clipStarts':clipStarts})
+		self.thread.start()
+
+	def play_subset(self, subset, clipStarts):
 		for clip in subset:
 			log.info("playing clip!")
 			player.QUEUE.play(clip)
